@@ -1,6 +1,7 @@
 package io.github.dmlloyd.im;
 
 import java.time.ZonedDateTime;
+import java.util.List;
 
 /**
  * An issue to import.
@@ -11,6 +12,10 @@ public record Issue(
     String description,
     ZonedDateTime created,
     ZonedDateTime updated,
-    ZonedDateTime resolved
+    ZonedDateTime resolved,
+    List<Comment> comments
 ) {
+    public Issue {
+        comments = List.copyOf(comments);
+    }
 }
