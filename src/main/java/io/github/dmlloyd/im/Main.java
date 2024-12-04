@@ -47,6 +47,6 @@ public final class Main {
             throw new IllegalArgumentException("No GitHub URL given");
         }
         // todo: actually do it...
-        
+
     }
 }

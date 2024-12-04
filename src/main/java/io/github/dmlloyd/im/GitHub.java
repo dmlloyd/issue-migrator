@@ -1,6 +1,12 @@
 package io.github.dmlloyd.im;
 
+import java.io.IOException;
+import java.io.StringReader;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Matcher;
@@ -104,6 +110,102 @@ public final class GitHub {
         }
     }
 
+    /**
+     * HTTP client for dealing with GitHub.
+     */
+    public static final class Client {
+        private final HttpClient client;
+        private final URI jiraUrl;
+        private final String owner;
+        private final String repo;
+        private final Map<String, String> userMapping;
+        private final Map<String, String> tokens;
+        private final String defaultToken;
+
+        public Client(final HttpClient client, final URI jiraUrl, final String owner, final String repo, final Map<String, String> userMapping, final Map<String, String> tokens, final String defaultToken) {
+            this.client = client;
+            this.jiraUrl = fixJiraUri(jiraUrl);
+            this.owner = owner;
+            this.repo = repo;
+            this.userMapping = userMapping;
+            this.tokens = tokens;
+            this.defaultToken = defaultToken;
+        }
+
+        /**
+         * Create the issue.
+         *
+         * @param issue the issue
+         * @return the new issue number
+         * @throws IOException if there was an error
+         */
+        public int createIssue(Issue issue) throws IOException {
+            IssueCreationFactory icf = new IssueCreationFactory(jiraUrl, userMapping);
+            JsonObject req = icf.issueCreateRequest(issue);
+            final String createdByJira = "<todo>";
+            final String token;
+            String createdBy = userMapping.get(createdByJira);
+            if (createdBy != null) {
+                token = tokens.getOrDefault(createdBy, defaultToken);
+            } else {
+                token = defaultToken;
+            }
+            final HttpRequest request = HttpRequest.newBuilder()
+                .setHeader("Accept", "application/vnd.github+json")
+                .setHeader("Authorization", "Bearer " + token)
+                .setHeader("X-GitHub-Api-Version", "2022-11-28")
+                .POST(HttpRequest.BodyPublishers.ofString(req.toString()))
+                .uri(URI.create("https://api.github.com/repos/" + owner + "/" + repo + "/issues"))
+                .build();
+            try {
+                HttpResponse<JsonObject> response = client.send(request, ri -> HttpResponse.BodySubscribers.mapping(HttpResponse.BodySubscribers.ofString(StandardCharsets.UTF_8), str -> Json.createReader(new StringReader(str)).readObject()));
+                JsonObject body = response.body();
+                if (response.statusCode() == 201) {
+                    return body.getInt("number");
+                } else {
+                    throw new IOException("Failed with status " + response.statusCode() + ": " + body.getString("message", "<no message>"));
+                }
+            } catch (InterruptedException e) {
+                throw new RuntimeException("Unexpectedly interrupted");
+            }
+        }
+
+        public void createComment(Issue issue, Comment comment, final Map<String, Integer> mappedIssueNumbers) throws IOException {
+            Integer issueNum = mappedIssueNumbers.get(issue.key());
+            if (issueNum == null) {
+                throw new IllegalArgumentException("Issue " + issue.key() + " was not mapped");
+            }
+            CommentCreationFactory ccf = new CommentCreationFactory(jiraUrl, userMapping, mappedIssueNumbers);
+            JsonObject req = ccf.commentCreateRequest(issue, comment);
+            final String createdByJira = "<todo>";
+            final String token;
+            String createdBy = userMapping.get(createdByJira);
+            if (createdBy != null) {
+                token = tokens.getOrDefault(createdBy, defaultToken);
+            } else {
+                token = defaultToken;
+            }
+            final HttpRequest request = HttpRequest.newBuilder()
+                .setHeader("Accept", "application/vnd.github+json")
+                .setHeader("Authorization", "Bearer " + token)
+                .setHeader("X-GitHub-Api-Version", "2022-11-28")
+                .POST(HttpRequest.BodyPublishers.ofString(req.toString()))
+                .uri(URI.create("https://api.github.com/repos/" + owner + "/" + repo + "/issues/" + issueNum + "/comments"))
+                .build();
+            try {
+                HttpResponse<JsonObject> response = client.send(request, ri -> HttpResponse.BodySubscribers.mapping(HttpResponse.BodySubscribers.ofString(StandardCharsets.UTF_8), str -> Json.createReader(new StringReader(str)).readObject()));
+                JsonObject body = response.body();
+                if (response.statusCode() == 201) {
+                    return;
+                } else {
+                    throw new IOException("Failed with status " + response.statusCode() + ": " + body.getString("message", "<no message>"));
+                }
+            } catch (InterruptedException e) {
+                throw new RuntimeException("Unexpectedly interrupted");
+            }
+        }
+    }
+
     private static @NotNull String remapIssueKeys(final String originalBody, final Map<String, Integer> mappedIssueNumbers) {
         StringBuilder newBody = new StringBuilder(originalBody.length());
         Pattern pattern = Pattern.compile("(?:https?://[a-zA-Z0-9./]+)?([A-Z0-9]+-\\d+)(?:\\\\?\\S+)?");
@@ -119,8 +221,7 @@ public final class GitHub {
             }
         }
         matcher.appendTail(newBody);
-        String body = newBody.toString();
-        return body;
+        return newBody.toString();
     }
 
     private static URI fixJiraUri(final URI jiraUrl) {
