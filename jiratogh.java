@@ -1,4 +1,6 @@
-package io.github.dmlloyd.im;
+///usr/bin/env jbang "$0" "$@" ; exit $?
+//JAVA 21+
+//DEPS io.github.dmlloyd.im:issue-migrator:1.0-SNAPSHOT
 
 import java.io.IOException;
 import java.net.URI;
@@ -6,11 +8,14 @@ import java.net.URISyntaxException;
 import java.util.Iterator;
 import java.util.List;
 
+import io.github.dmlloyd.im.*;
+
 /**
- * The main entry.
+ * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
  */
-public final class Main {
-    public static void main(String[] argsArray) throws IOException, URISyntaxException {
+public class jiratogh {
+
+    public static void main(String[] argsArray) throws Exception {
         List<String> args = List.of(argsArray);
         Iterator<String> iterator = args.iterator();
         URI jiraUrl = null;
@@ -47,6 +52,5 @@ public final class Main {
             throw new IllegalArgumentException("No GitHub URL given");
         }
         // todo: actually do it...
-
     }
 }
