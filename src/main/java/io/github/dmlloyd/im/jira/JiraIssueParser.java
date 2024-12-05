@@ -24,21 +24,22 @@ import jakarta.json.bind.JsonbConfig;
  */
 public class JiraIssueParser implements AutoCloseable {
     private final Jsonb jsonb;
+    private final boolean closeJsonb;
 
     public JiraIssueParser() {
         this(JsonbBuilder.create(new JsonbConfig().
-                setProperty(JsonbConfig.DATE_FORMAT, "yyyy-MM-dd'T'HH:mm:ss.SSSZ"))
+                setProperty(JsonbConfig.DATE_FORMAT, "yyyy-MM-dd'T'HH:mm:ss.SSSZ")),
+                true
         );
     }
 
     public JiraIssueParser(final Jsonb jsonb) {
-        this.jsonb = jsonb;
+        this(jsonb, false);
     }
 
-    public static void main(final String[] args) throws Exception {
-        try (JiraIssueParser parser = new JiraIssueParser()) {
-            System.out.println(parser.parse(Path.of("./src/test/resources/")));
-        }
+    private JiraIssueParser(final Jsonb jsonb, final boolean closeJsonb) {
+        this.jsonb = jsonb;
+        this.closeJsonb = closeJsonb;
     }
 
     /**
@@ -100,7 +101,9 @@ public class JiraIssueParser implements AutoCloseable {
 
     @Override
     public void close() throws Exception {
-        jsonb.close();
+        if (closeJsonb) {
+            jsonb.close();
+        }
     }
 
     public record IssueResult(long id, String key, IssueField fields) {
