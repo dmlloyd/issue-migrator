@@ -4,6 +4,8 @@ import java.net.URI;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import io.github.dmlloyd.im.jira.JiraIssue;
 import io.github.dmlloyd.im.jira.JiraIssueFetcher;
@@ -18,7 +20,8 @@ public final class Main {
         URI jiraUrl = null;
         String jiraProjectId = null;
         URI input = null;
-        URI gitHubUrl = null;
+        String owner = null;
+        String repo = null;
         boolean dryRun = false;
         while (iterator.hasNext()) {
             String arg = iterator.next();
@@ -31,14 +34,24 @@ public final class Main {
                                --jira-project  the Jira project id
                                --input         the input file name or remote URL
                                --dry-run       to not actually commit anything
-                               --github        the URL of the target GitHub project
+                               --repo          the GitHub owner/repo
                             """);
                 }
                 case "--jira-url" -> jiraUrl = new URI(iterator.next());
                 case "--jira-project" -> jiraProjectId = iterator.next();
                 case "--input" -> input = new URI(iterator.next());
                 case "--dry-run" -> dryRun = true;
-                case "--github" -> gitHubUrl = new URI(iterator.next());
+                case "--repo" -> {
+                    String orgRepo = iterator.next();
+                    Pattern pattern = Pattern.compile("([a-zA-Z0-9-_.]+)/([a-zA-Z0-9-_.]+)");
+                    Matcher matcher = pattern.matcher(orgRepo);
+                    if (matcher.matches()) {
+                        owner = matcher.group(1);
+                        repo = matcher.group(2);
+                    } else {
+                        throw new IllegalArgumentException("Invalid syntax for --repo (expected `owner/repo`)");
+                    }
+                }
                 default -> throw new IllegalArgumentException("Unexpected argument: " + arg);
             }
         }
@@ -51,8 +64,8 @@ public final class Main {
         if (input == null) {
             throw new IllegalArgumentException("No input file or URL given");
         }
-        if (gitHubUrl == null) {
-            throw new IllegalArgumentException("No GitHub URL given");
+        if (owner == null || repo == null) {
+            throw new IllegalArgumentException("No GitHub owner/repo given");
         }
         final Set<JiraIssue> jiraIssues;
         if (!dryRun) {
